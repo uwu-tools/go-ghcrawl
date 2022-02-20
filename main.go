@@ -69,12 +69,19 @@ func NewClient() (
 	return client, orgs, repos, nil
 }
 
+type Repo struct {
+	GH       *github.Repository
+	Metadata *InnerSourceMetadata
+}
+
 // InnerSource components
 
 // GetRepositoryActivityScore
 // (From https://patterns.innersourcecommons.org/p/repository-activity-score)
 // Calculate a virtual InnerSource score from stars, watches, commits, and issues.
-func GetRepositoryActivityScore(repo *github.Repository) int {
+func GetRepositoryActivityScore(repo *Repo) int {
+	ghRepo := repo.GH
+
 	// TODO: Consider handling score as a float64
 	// initial score is 50 to give active repos with low GitHub KPIs (forks,
 	// watchers, stars) a better starting point
@@ -83,14 +90,14 @@ func GetRepositoryActivityScore(repo *github.Repository) int {
 	// weighting: forks and watches count most, then stars, add some little score
 	// for open issues, too
 	// TODO: Does it matter if these values are not populated?
-	score += *repo.ForksCount * 5
-	score += *repo.SubscribersCount
-	score += *repo.StargazersCount / 3
-	score += *repo.OpenIssuesCount / 5
+	score += *ghRepo.ForksCount * 5
+	score += *ghRepo.SubscribersCount
+	score += *ghRepo.StargazersCount / 3
+	score += *ghRepo.OpenIssuesCount / 5
 
 	// updated in last 3 months: adds a bonus multiplier between 0..1 to overall
 	// score (1 = updated today, 0 = updated more than 100 days ago)
-	lastUpdatedTimestamp := repo.GetUpdatedAt()
+	lastUpdatedTimestamp := ghRepo.GetUpdatedAt()
 	lastUpdatedTime := lastUpdatedTimestamp.Time
 	timeSinceLastUpdate := time.Since(lastUpdatedTime)
 	// TODO: Is this an accurate representation of days?
@@ -118,7 +125,7 @@ func GetRepositoryActivityScore(repo *github.Repository) int {
 
 	// gradually scale down boost according to repository creation date to mix
 	// with "real" engagement stats
-	creationTimestamp := repo.GetCreatedAt()
+	creationTimestamp := ghRepo.GetCreatedAt()
 	creationTime := creationTimestamp.Time
 	timeSinceCreation := time.Since(creationTime)
 	// TODO: Is this an accurate representation of days?
