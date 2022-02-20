@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -172,7 +173,7 @@ func getSearchQuery(opts *Options) string {
 		query += "+" + topicsPart
 	}
 
-	return query
+	return url.QueryEscape(query)
 }
 
 // BEGIN COPY FROM sigs.k8s.io/release-sdk/github
