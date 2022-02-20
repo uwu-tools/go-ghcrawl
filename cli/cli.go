@@ -21,11 +21,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v42/github"
 	"github.com/spf13/cobra"
+	"golang.org/x/oauth2"
+	"sigs.k8s.io/release-utils/env"
 )
 
 type Options struct {
@@ -119,10 +123,7 @@ func GetRepos(ctx context.Context) ([]*github.Repository, error) {
 		* [AWS CodeCommit](https://aws.amazon.com/codecommit/) Crawler implementation with Python: [aws-samples/codecommit-crawler-innersource](https://github.com/aws-samples/codecommit-crawler-innersource)
 	*/
 
-	gh, err := NewClient()
-	if err != nil {
-		return nil, err
-	}
+	gh := NewClient()
 
 	// TODO: Populate search options
 	query := getSearchQuery(opts)
@@ -174,12 +175,75 @@ func getSearchQuery(opts *Options) string {
 	return query
 }
 
-func NewClient() (client *github.Client, err error) {
-	// TODO(http): Consider passing a roundtripper here
-	client = github.NewClient(nil)
+// BEGIN COPY FROM sigs.k8s.io/release-sdk/github
 
-	return client, nil
+const (
+	// TokenEnvKey is the default GitHub token environemt variable key
+	TokenEnvKey = "GITHUB_TOKEN"
+	// GitHubURL Prefix for github URLs
+	GitHubURL = "https://github.com/"
+)
+
+// TODO: we should clean up the functions listed below and agree on the same
+// return type (with or without error):
+// - New
+// - NewClientWithToken
+// - NewEnterpriseClient
+// - NewEnterpriseClientWithToken
+
+// New creates a new default GitHub client. Tokens set via the $GITHUB_TOKEN
+// environment variable will result in an authenticated client.
+// If the $GITHUB_TOKEN is not set, then the client will do unauthenticated
+// GitHub requests.
+func NewClient() *github.Client {
+	// TODO(http): Consider passing a roundtripper here
+	token := env.Default(TokenEnvKey, "")
+	client, _ := NewClientWithToken(token) // nolint: errcheck
+	return client
 }
+
+// NewClientWithToken can be used to specify a GitHub token through parameters.
+// Empty string will result in unauthenticated client, which makes
+// unauthenticated requests.
+func NewClientWithToken(token string) (*github.Client, error) {
+	ctx := context.Background()
+	client := http.DefaultClient
+	state := "unauthenticated"
+	if token != "" {
+		state = strings.TrimPrefix(state, "un")
+		client = oauth2.NewClient(ctx, oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: token},
+		))
+	}
+
+	return github.NewClient(client), nil
+}
+
+func NewEnterpriseClient(baseURL, uploadURL string) (*github.Client, error) {
+	token := env.Default(TokenEnvKey, "")
+	return NewEnterpriseClientWithToken(baseURL, uploadURL, token)
+}
+
+func NewEnterpriseClientWithToken(baseURL, uploadURL, token string) (*github.Client, error) {
+	ctx := context.Background()
+	client := http.DefaultClient
+	state := "unauthenticated"
+	if token != "" {
+		state = strings.TrimPrefix(state, "un")
+		client = oauth2.NewClient(ctx, oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: token},
+		))
+	}
+
+	ghclient, err := github.NewEnterpriseClient(baseURL, uploadURL, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to new github client: %s", err)
+	}
+
+	return ghclient, nil
+}
+
+// END COPY FROM sigs.k8s.io/release-sdk/github
 
 type Repo struct {
 	GH       *github.Repository
