@@ -24,49 +24,56 @@ import (
 	"github.com/google/go-github/v42/github"
 )
 
-/*
-Crawler reference implementations
+type Options struct {
+	User          string
+	Organizations []string
+	Visibility    string
+}
 
-(From https://github.com/SAP/project-portal-for-innersource/blob/main/docs/CRAWLING.md)
+var opts = &Options{
+	Visibility: "public",
+}
 
-You will have to adapt all of these crawler implementations to your exact setup. However they may give you a good starting points.
+func GetRepos(ctx context.Context) ([]*github.Repository, error) {
+	/*
+		Crawler reference implementations
 
-* A plain GitHub API call with some post-processing in [jq](https://stedolan.github.io/jq/). This call will query all repos in a GitHub organization with topic `inner-source` and store it in a local file ([oauth token](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token) with permission `repo` required). This can for example be used to have a quick demo of the portal up and running with your own data.
+		(From https://github.com/SAP/project-portal-for-innersource/blob/main/docs/CRAWLING.md)
 
-  ``` sh
-  curl -u <username>:<oauth_token> https://api.github.com/search/repositories?q=org:<org>+topic:inner-source | jq '.items' > repos.json
-  ```
+		You will have to adapt all of these crawler implementations to your exact setup. However they may give you a good starting points.
 
-* GitHub Crawler implementation with Ruby: [spier/innersource-crawler-ruby](https://github.com/spier/innersource-crawler-ruby)
-* GitHub Crawler implementation with Python: [zkoppert/innersource-crawler](https://github.com/zkoppert/innersource-crawler)
-* [AWS CodeCommit](https://aws.amazon.com/codecommit/) Crawler implementation with Python: [aws-samples/codecommit-crawler-innersource](https://github.com/aws-samples/codecommit-crawler-innersource)
+		* A plain GitHub API call with some post-processing in [jq](https://stedolan.github.io/jq/). This call will query all repos in a GitHub organization with topic `inner-source` and store it in a local file ([oauth token](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token) with permission `repo` required). This can for example be used to have a quick demo of the portal up and running with your own data.
 
-In the following sections we explain the data structure of `repos.json` and how you would populate it with your own crawler. You will also find [Crawler reference implementations](#reference-implementations) that you can use as starting points for your own crawler.
-*/
+		  ``` sh
+		  curl -u <username>:<oauth_token> https://api.github.com/search/repositories?q=org:<org>+topic:inner-source | jq '.items' > repos.json
+		  ```
 
-func NewClient() (
-	client *github.Client,
-	orgs []*github.Organization,
-	repos []*github.Repository,
-	err error,
-) {
+		* GitHub Crawler implementation with Ruby: [spier/innersource-crawler-ruby](https://github.com/spier/innersource-crawler-ruby)
+		* GitHub Crawler implementation with Python: [zkoppert/innersource-crawler](https://github.com/zkoppert/innersource-crawler)
+		* [AWS CodeCommit](https://aws.amazon.com/codecommit/) Crawler implementation with Python: [aws-samples/codecommit-crawler-innersource](https://github.com/aws-samples/codecommit-crawler-innersource)
+	*/
+
+	gh, err := NewClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Populate query options
+	results, _, err := gh.Search.Repositories(ctx, "", &github.SearchOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	repos := results.Repositories
+
+	return repos, nil
+}
+
+func NewClient() (client *github.Client, err error) {
 	// TODO(http): Consider passing a roundtripper here
 	client = github.NewClient(nil)
 
-	// list all organizations for user "justaugustus"
-	orgs, _, err = client.Organizations.List(context.Background(), "justaugustus", nil)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// list public repositories for org "github"
-	opt := &github.RepositoryListByOrgOptions{Type: "public"}
-	repos, _, err = client.Repositories.ListByOrg(context.Background(), "github", opt)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return client, orgs, repos, nil
+	return client, nil
 }
 
 type Repo struct {
