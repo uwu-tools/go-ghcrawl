@@ -69,6 +69,8 @@ func NewClient() (
 	return client, orgs, repos, nil
 }
 
+// InnerSource components
+
 // GetRepositoryActivityScore
 // (From https://patterns.innersourcecommons.org/p/repository-activity-score)
 // Calculate a virtual InnerSource score from stars, watches, commits, and issues.
@@ -158,4 +160,52 @@ func GetRepositoryActivityScore(repo *github.Repository) int {
 	*/
 
 	return score
+}
+
+// innersource.json
+// From https://github.com/SAP/project-portal-for-innersource/blob/main/docs/LISTING.md#syntax-definition-of-innersourcejson
+
+type InnerSourceMetadata struct {
+	/*
+		{
+			"title": "Readable Project Name (optional)",
+			"motivation": "A short statement why this project is InnerSource and why contributors should care (optional)",
+			"contributions": [
+				"List",
+				"Of",
+				"Requested",
+				"Contributions",
+				"Like",
+				"Bugfixes",
+				"Features",
+				"Infrastructure",
+				"Documentation",
+				"..."
+			],
+			"skills": [
+				"Skills",
+				"Required",
+				"To",
+				"Contribute",
+				"Like",
+				"Node.js",
+				"Java",
+				"C++",
+				"..."
+			],
+			"logo": "path/to/your/project-logo.png (optional)",
+			"docs": "http://url/to/project/documentation (optional)",
+			"language": "JavaScript (optional)"
+		}
+	*/
+
+	Title         string
+	Motivation    string
+	Contributions []string
+	Skills        []string
+	Logo          string
+	Docs          string
+	Language      string
+
+	Score int
 }
