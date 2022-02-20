@@ -18,6 +18,8 @@ package main
 
 import (
 	"context"
+	"math"
+	"time"
 
 	"github.com/google/go-github/v42/github"
 )
@@ -71,6 +73,7 @@ func NewClient() (
 // (From https://patterns.innersourcecommons.org/p/repository-activity-score)
 // Calculate a virtual InnerSource score from stars, watches, commits, and issues.
 func GetRepositoryActivityScore(repo *github.Repository) int {
+	// TODO: Consider handling score as a float64
 	// initial score is 50 to give active repos with low GitHub KPIs (forks,
 	// watchers, stars) a better starting point
 	score := 50
@@ -85,10 +88,15 @@ func GetRepositoryActivityScore(repo *github.Repository) int {
 
 	// updated in last 3 months: adds a bonus multiplier between 0..1 to overall
 	// score (1 = updated today, 0 = updated more than 100 days ago)
-	/*
-		let iDaysSinceLastUpdate = (new Date().getTime() - new Date(repo.updated_at).getTime()) / 1000 / 86400;
-		iScore = iScore * ((1 + (100 - Math.min(iDaysSinceLastUpdate, 100))) / 100);
-	*/
+	lastUpdatedTimestamp := repo.GetUpdatedAt()
+	lastUpdatedTime := lastUpdatedTimestamp.Time
+	timeSinceLastUpdate := time.Since(lastUpdatedTime)
+	// TODO: Is this an accurate representation of days?
+	daysSinceLastUpdate := timeSinceLastUpdate.Hours() / 24
+
+	updateMultiplier64 := (1 + (100 - math.Min(daysSinceLastUpdate, 100))) / 100
+	updateMultiplier := int(updateMultiplier64)
+	score *= int(updateMultiplier)
 
 	// evaluate participation stats for the previous 3 months
 	/*
@@ -103,21 +111,23 @@ func GetRepositoryActivityScore(repo *github.Repository) int {
 	// boost calculation:
 	// all repositories updated in the previous year will receive a boost of
 	// maximum 1000 declining by days since last update
-	/*
-		let iBoost = (1000 - Math.min(iDaysSinceLastUpdate, 365) * 2.74);
-	*/
+	boost64 := (1000 - math.Min(daysSinceLastUpdate, 365)*2.74)
+	boost := int(boost64)
 
 	// gradually scale down boost according to repository creation date to mix
 	// with "real" engagement stats
-	/*
-		let iDaysSinceCreation = (new Date().getTime() - new Date(repo.created_at).getTime()) / 1000 / 86400;
-		iBoost *= (365 - Math.min(iDaysSinceCreation, 365)) / 365;
-	*/
+	creationTimestamp := repo.GetCreatedAt()
+	creationTime := creationTimestamp.Time
+	timeSinceCreation := time.Since(creationTime)
+	// TODO: Is this an accurate representation of days?
+	daysSinceCreation := timeSinceCreation.Hours() / 24
+
+	creationBoost64 := (365 - math.Min(daysSinceCreation, 365)) / 365
+	creationBoost := int(creationBoost64)
+	boost *= creationBoost
 
 	// add boost to score
-	/*
-		iScore += iBoost;
-	*/
+	score += boost
 
 	// give projects with a meaningful description a static boost of 50
 	/*
@@ -132,17 +142,15 @@ func GetRepositoryActivityScore(repo *github.Repository) int {
 
 	// build in a logarithmic scale for very active projects (open ended but
 	// stabilizing around 5000)
-	/*
-		if (iScore > 3000) {
-			iScore = 3000 + Math.log(iScore) * 100;
-		}
-	*/
+	if score > 3000 {
+		logScore64 := 3000 + math.Log(float64(score))*100
+		logScore := int(logScore64)
+		score = logScore
+	}
 
 	// final score is a rounded value starting from 0 (subtract the initial
 	// value)
-	/*
-		iScore = Math.round(iScore - 50);
-	*/
+	score = int(math.Round(float64(score) - 50))
 
 	// add score to metadata on the fly
 	/*
