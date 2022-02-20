@@ -18,10 +18,13 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"math"
+	"os"
 	"time"
 
 	"github.com/google/go-github/v42/github"
+	"github.com/spf13/cobra"
 )
 
 type Options struct {
@@ -33,6 +36,28 @@ type Options struct {
 var opts = &Options{
 	Visibility: "public",
 }
+
+var rootCmd = &cobra.Command{
+	Use:   "ghcrawl",
+	Short: "ghcrawl",
+	Long:  `ghcrawl`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// Do Stuff Here
+	},
+}
+
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringP("author", "a", "YOUR NAME", "author name for copyright attribution")
+}
+
+// TODO: Reorganize below into separate packages
 
 func GetRepos(ctx context.Context) ([]*github.Repository, error) {
 	/*
