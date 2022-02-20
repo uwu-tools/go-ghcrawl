@@ -108,6 +108,7 @@ func GetRepositoryActivityScore(repo *Repo) int {
 	score *= int(updateMultiplier)
 
 	// evaluate participation stats for the previous 3 months
+	// TODO: Populate logic
 	/*
 		repo._InnerSourceMetadata = repo._InnerSourceMetadata || {};
 		if (repo._InnerSourceMetadata.participation) {
@@ -139,15 +140,16 @@ func GetRepositoryActivityScore(repo *Repo) int {
 	score += boost
 
 	// give projects with a meaningful description a static boost of 50
-	/*
-		iScore += (repo.description?.length > 30 || repo._InnerSourceMetadata.motivation?.length > 30 ? 50 : 0);
-	*/
+	if len(*ghRepo.Description) > 30 || len(repo.Metadata.Motivation) > 30 {
+		score += 50
+	}
 
 	// give projects with contribution guidelines (CONTRIBUTING.md) file a static
 	// boost of 100
-	/*
-		iScore += (repo._InnerSourceMetadata.guidelines ? 100 : 0);
-	*/
+	// TODO: Add logic for querying CONTRIBUTING.md URL from GitHub
+	if repo.Metadata.Guidelines != "" {
+		score += 100
+	}
 
 	// build in a logarithmic scale for very active projects (open ended but
 	// stabilizing around 5000)
@@ -162,9 +164,7 @@ func GetRepositoryActivityScore(repo *Repo) int {
 	score = int(math.Round(float64(score) - 50))
 
 	// add score to metadata on the fly
-	/*
-		repo._InnerSourceMetadata.score = iScore;
-	*/
+	repo.Metadata.Score = score
 
 	return score
 }
@@ -214,5 +214,8 @@ type InnerSourceMetadata struct {
 	Docs          string
 	Language      string
 
-	Score int
+	// TODO: These fields are not documented but potentially in use
+	Participation string
+	Guidelines    string
+	Score         int
 }
