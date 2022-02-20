@@ -18,6 +18,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -30,6 +31,7 @@ import (
 type Options struct {
 	User          string
 	Organizations []string
+	Topics        []string
 	Visibility    string
 }
 
@@ -41,9 +43,7 @@ var rootCmd = &cobra.Command{
 	Use:   "ghcrawl",
 	Short: "ghcrawl",
 	Long:  `ghcrawl`,
-	Run: func(cmd *cobra.Command, args []string) {
-		// Do Stuff Here
-	},
+	Run:   run,
 }
 
 func Execute() {
@@ -54,7 +54,48 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringP("author", "a", "YOUR NAME", "author name for copyright attribution")
+	rootCmd.PersistentFlags().StringVar(
+		&opts.User,
+		"user",
+		"",
+		"user to query",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&opts.Visibility,
+		"visibility",
+		"public",
+		"repo visibility",
+	)
+
+	rootCmd.PersistentFlags().StringArrayVar(
+		&opts.Organizations,
+		"orgs",
+		[]string{},
+		"organizations to query",
+	)
+
+	rootCmd.PersistentFlags().StringArrayVar(
+		&opts.Topics,
+		"topics",
+		[]string{},
+		"topics to query",
+	)
+}
+
+func run(cmd *cobra.Command, args []string) {
+	ctx := context.Background()
+	repos, err := GetRepos(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	output, err := json.Marshal(repos)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(output))
 }
 
 // TODO: Reorganize below into separate packages
@@ -83,8 +124,13 @@ func GetRepos(ctx context.Context) ([]*github.Repository, error) {
 		return nil, err
 	}
 
-	// TODO: Populate query options
-	results, _, err := gh.Search.Repositories(ctx, "", &github.SearchOptions{})
+	// TODO: Populate search options
+	query := getSearchQuery(opts)
+	results, _, err := gh.Search.Repositories(
+		ctx,
+		query,
+		&github.SearchOptions{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +138,40 @@ func GetRepos(ctx context.Context) ([]*github.Repository, error) {
 	repos := results.Repositories
 
 	return repos, nil
+}
+
+func getSearchQuery(opts *Options) string {
+	var query string
+
+	// TODO: Can we handle multiple orgs in this query?
+	var orgs string
+	var orgsPart string
+
+	if len(opts.Organizations) > 0 {
+		orgs = opts.Organizations[0]
+		orgsPart = fmt.Sprintf("org:%s", orgs)
+	}
+
+	visibilityPart := fmt.Sprintf("is:%s", opts.Visibility)
+
+	var topics string
+	var topicsPart string
+
+	// TODO: Can we handle multiple topics in this query?
+	if len(opts.Topics) > 0 {
+		topics = opts.Topics[0]
+		topicsPart = fmt.Sprintf("topic:%s", topics)
+	}
+
+	query += orgsPart
+	if visibilityPart != "" {
+		query += "+" + visibilityPart
+	}
+	if topicsPart != "" {
+		query += "+" + topicsPart
+	}
+
+	return query
 }
 
 func NewClient() (client *github.Client, err error) {
